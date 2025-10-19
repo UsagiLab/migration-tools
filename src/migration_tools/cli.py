@@ -40,17 +40,21 @@ def merge(
     ),
     batch_size: int = typer.Option(500, min=1, help="每批批处理的数据量"),
     dry_run: bool = typer.Option(False, help="仅演练，不提交任何更改"),
+    admin_user_id: Optional[int] = typer.Option(
+        None, help="当图片缺失上传用户时，补充的管理员用户ID"
+    ),
     log_level: Optional[str] = typer.Option("INFO", help="日志级别"),
 ) -> None:
     """将旧数据库中的用户与图片迁移到新架构。"""
 
     configure_logging(log_level)
     logging.getLogger(__name__).debug(
-        "执行 merge，source=%s target=%s batch_size=%s dry_run=%s",
+        "执行 merge，source=%s target=%s batch_size=%s dry_run=%s admin_user_id=%s",
         source,
         target,
         batch_size,
         dry_run,
+        admin_user_id,
     )
 
     config = MergeConfig(
@@ -58,6 +62,7 @@ def merge(
         target_url=target,
         batch_size=batch_size,
         dry_run=dry_run,
+        admin_user_id=admin_user_id,
     )
 
     try:

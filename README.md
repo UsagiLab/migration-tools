@@ -16,13 +16,13 @@ uv sync
 执行 `merge` 命令，将源 MariaDB 与目标 PostgreSQL 之间的 `users`、`images` 数据完成迁移：
 
 ```powershell
-uv run migration-tools merge --source "mysql+pymysql://user:pass@localhost:3307/usagi_card" --target "postgresql+psycopg://user:pass@localhost:5432/leporid"
+uv run migration-tools merge --source "mysql+pymysql://user:pass@localhost:3307/usagi_card" --target "postgresql+psycopg://user:pass@localhost:5432/leporid" --admin-user-id 1
 ```
 
 命令会：
 
 - 合并用户，并统一将目标库的权限设置为 `["NORMAL"]`。
-- 合并图片，自动填充 `aspect`、`labels`、`metadata` 等字段。
+- 对缺失上传者的图片，可通过 `--admin-user-id` 指定管理员账号接管，并保持其 `visibility=1`；原始带上传用户的图片会写入 `visibility=0`。
 - 确保所需的 `card-background` 与 `sega-passname` 图片比例配置存在，不存在则自动创建。
 
 ## 开发辅助

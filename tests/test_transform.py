@@ -68,4 +68,4 @@ def test_build_image_description_prefers_label_then_category_then_kind() -> None
 
 
 def test_normalize_privileges() -> None:
-    assert normalize_privileges(["ADMIN"]) == ["NORMAL"]
+    assert normalize_privileges(["ADMIN"]) == '["NORMAL"]'

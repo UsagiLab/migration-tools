@@ -29,6 +29,7 @@ class MergeConfig:
     target_url: str
     batch_size: int = 500
     dry_run: bool = False
+    admin_user_id: int | None = None
 
 
 @dataclass(slots=True)
@@ -62,6 +63,7 @@ def run_merge(config: MergeConfig) -> MergeResult:
                     source_conn=source_conn,
                     target_conn=target_conn,
                     batch_size=config.batch_size,
+                    admin_user_id=config.admin_user_id,
                 )
             except Exception:
                 logger.exception("迁移过程中发生错误，正在回滚")
@@ -169,13 +171,20 @@ def _upsert_users(conn: Connection, payload: Sequence[dict]) -> None:
 
 
 def merge_images(
-    *, source_conn: Connection, target_conn: Connection, batch_size: int
+    *,
+    source_conn: Connection,
+    target_conn: Connection,
+    batch_size: int,
+    admin_user_id: int | None = None,
 ) -> MergeSectionResult:
     summary = MergeSectionResult()
     ensure_required_aspects(target_conn)
 
     existing_uuids = _collect_existing_ids(target_conn, "tbl_image", column="uuid")
     known_user_ids = _collect_existing_ids(target_conn, "tbl_user")
+
+    if admin_user_id is not None and admin_user_id not in known_user_ids:
+        raise ValueError(f"admin-user-id {admin_user_id} 不存在于目标库的 tbl_user 中")
 
     stmt = text(
         """
@@ -191,13 +200,22 @@ def merge_images(
         summary.processed += 1
 
         if row.uploaded_by is None:
-            summary.skipped += 1
-            logger.warning("图片 %s 无上传用户，已跳过", row.uuid)
-            continue
-        if row.uploaded_by not in known_user_ids:
+            if admin_user_id is None:
+                summary.skipped += 1
+                logger.warning(
+                    "图片 %s 无上传用户且未提供 admin-user-id，已跳过", row.uuid
+                )
+                continue
+            user_id = admin_user_id
+            visibility = 1
+        else:
+            user_id = row.uploaded_by
+            visibility = 0
+
+        if user_id not in known_user_ids:
             summary.skipped += 1
             logger.warning(
-                "图片 %s 的用户 %s 不存在于目标库，已跳过", row.uuid, row.uploaded_by
+                "图片 %s 的用户 %s 不存在于目标库，已跳过", row.uuid, user_id
             )
             continue
 
@@ -208,7 +226,7 @@ def merge_images(
             logger.warning("图片 %s 跳过：%s", row.uuid, exc)
             continue
 
-        entry = _adapt_image_row(row, aspect_id)
+        entry = _adapt_image_row(row, aspect_id, user_id, visibility)
 
         if row.uuid in existing_uuids:
             summary.updated += 1
@@ -279,17 +297,17 @@ def ensure_required_aspects(target_conn: Connection) -> None:
     )
 
 
-def _adapt_image_row(row: Row, aspect_id: str) -> dict:
+def _adapt_image_row(row: Row, aspect_id: str, user_id: int, visibility: int) -> dict:
     uploaded_at = _ensure_datetime(row.uploaded_at)
     labels = build_image_labels(row.kind, row.category)
 
     return {
         "uuid": row.uuid,
-        "user_id": row.uploaded_by,
+        "user_id": user_id,
         "aspect_id": aspect_id,
         "name": build_image_name(row.label, row.uuid, row.kind),
         "description": build_image_description(row.label, row.category, row.kind),
-        "visibility": 1,
+        "visibility": visibility,
         "labels": labels,
         "file_name": row.file_name,
         "metadata_id": row.trace_id,

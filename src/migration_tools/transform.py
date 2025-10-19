@@ -55,9 +55,9 @@ def build_image_description(
     return "Legacy image imported via migration-tools"
 
 
-def normalize_privileges(_: Iterable[str] | None = None) -> List[str]:
+def normalize_privileges(_: Iterable[str] | None = None) -> str:
     """All migrated用户默认给予 NORMAL 权限。"""
-    return ["NORMAL"]
+    return '["NORMAL"]'
 
 
 @dataclass(slots=True)
